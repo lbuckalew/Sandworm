@@ -6,6 +6,10 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
 use sdl2::video::Window;
+
+use rand::Rng;
+use rand::distributions::{Distribution, Standard};
+
 use std::ops::Add;
 use std::time::Duration;
 
@@ -24,6 +28,7 @@ pub enum GameState {
     Over,
 }
 
+#[derive(PartialEq)]
 pub enum WormDirection {
     Up,
     Right,
@@ -46,12 +51,23 @@ impl Add<Coord> for Coord {
         }
     }
 }
+impl Distribution<Coord> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Coord {
+        let rand_x = rng.gen_range(0..SPICEFIELD_SIZE_X as i32);
+        let rand_y = rng.gen_range(0..SPICEFIELD_SIZE_Y as i32);
+        Coord {
+            x: rand_x,
+            y: rand_y,
+        }
+    }
+}
 
 pub struct GameContext {
-    pub sandworm: Vec<Coord>,
-    pub sandworm_dir: WormDirection,
-    pub sarduakar_invader: Coord,
-    pub current_state: GameState,
+    sandworm: Vec<Coord>,
+    sandworm_dir: WormDirection,
+    sarduakar_invader: Coord,
+    current_state: GameState,
+    rng: rand::rngs::ThreadRng,
 }
 
 impl GameContext {
@@ -65,10 +81,12 @@ impl GameContext {
             sandworm_dir: WormDirection::Right,
             sarduakar_invader: Coord { x: 3, y: 3 },
             current_state: GameState::Paused,
+            rng: rand::thread_rng(),
         }
     }
 
     pub fn update_state(&mut self) {
+        // check to see if game is over
         if let GameState::Paused = self.current_state {
             return;
         }
@@ -94,6 +112,8 @@ impl GameContext {
             self.sandworm.reverse();
             // Add new tail
             self.grow_worm();
+
+            self.new_saduakar();
         } else {
             // Remove tail segment
             self.sandworm.pop();
@@ -109,7 +129,6 @@ impl GameContext {
     }
 
     pub fn move_down(&mut self) {
-        println!("Move down!");
         self.sandworm_dir = WormDirection::Down;
     }
 
@@ -129,9 +148,18 @@ impl GameContext {
         }
     }
 
+    fn new_saduakar(&mut self) {
+        let mut new_coord: Coord = self.rng.gen();
+        loop {
+            if !self.sandworm.contains(&new_coord) {break;}
+            new_coord = self.rng.gen();
+        }
+        self.sarduakar_invader = new_coord;
+    }
+
     // See if a candidate Coord is in bounds of the game
     fn is_in_bounds(&self, c: Coord) -> bool {
-        c.x > 0 && c.x < SPICEFIELD_SIZE_X as i32 && c.y > 0 && c.y < SPICEFIELD_SIZE_Y as i32
+        c.x >= 0 && c.x <= SPICEFIELD_SIZE_X as i32 && c.y >= 0 && c.y <= SPICEFIELD_SIZE_Y as i32
     }
 
     // Determine which way to grow the sandworm tail and add a segment
@@ -256,10 +284,10 @@ pub fn main() -> Result<(), String> {
                     keycode: Some(keycode),
                     ..
                 } => match keycode {
-                    Keycode::W => ctx.move_up(),
-                    Keycode::D => ctx.move_right(),
-                    Keycode::S => ctx.move_down(),
-                    Keycode::A => ctx.move_left(),
+                    Keycode::W => if ctx.sandworm_dir != WormDirection::Down {ctx.move_up()},
+                    Keycode::D => if ctx.sandworm_dir != WormDirection::Left {ctx.move_right()},
+                    Keycode::S => if ctx.sandworm_dir != WormDirection::Up {ctx.move_down()},
+                    Keycode::A => if ctx.sandworm_dir != WormDirection::Right {ctx.move_left()},
                     Keycode::Escape => ctx.toggle_pause(),
                     _ => {}
                 },
@@ -268,7 +296,6 @@ pub fn main() -> Result<(), String> {
         }
 
         if frames % 10 == 0 {
-            println!("update state");
             ctx.update_state();
             frames = 0;
         }
