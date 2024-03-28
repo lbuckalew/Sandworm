@@ -1,16 +1,19 @@
 extern crate sdl2;
 
 use sdl2::event::Event;
+use sdl2::image::{InitFlag, LoadTexture};
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use sdl2::render::WindowCanvas;
-use sdl2::video::Window;
+use sdl2::render::{Canvas, Texture, TextureCreator, WindowCanvas};
+use sdl2::video::{Window, WindowContext};
 
-use rand::Rng;
 use rand::distributions::{Distribution, Standard};
+use rand::Rng;
 
+use std::env;
 use std::ops::Add;
+use std::path::Path;
 use std::time::Duration;
 
 // Grid units (how many sandworm segments per x or y)
@@ -21,6 +24,9 @@ const SANDWORM_SEGMENT_PX: u32 = 20;
 // Window size in pixels
 const WINDOW_SIZE_X: u32 = SPICEFIELD_SIZE_X * SANDWORM_SEGMENT_PX;
 const WINDOW_SIZE_Y: u32 = SPICEFIELD_SIZE_Y * SANDWORM_SEGMENT_PX;
+// Filepaths to assets
+const DESERT_TEXTURE_1: &str = "src/assets/desert1.png";
+const DESERT_TEXTURE_2: &str = "assets/desert2.png";
 
 pub enum GameState {
     Playing,
@@ -43,7 +49,6 @@ pub struct Coord {
 }
 impl Add<Coord> for Coord {
     type Output = Coord;
-
     fn add(self, arg: Coord) -> Self::Output {
         Coord {
             x: self.x + arg.x,
@@ -69,7 +74,6 @@ pub struct GameContext {
     current_state: GameState,
     rng: rand::rngs::ThreadRng,
 }
-
 impl GameContext {
     pub fn new() -> GameContext {
         GameContext {
@@ -151,7 +155,9 @@ impl GameContext {
     fn new_saduakar(&mut self) {
         let mut new_coord: Coord = self.rng.gen();
         loop {
-            if !self.sandworm.contains(&new_coord) {break;}
+            if !self.sandworm.contains(&new_coord) {
+                break;
+            }
             new_coord = self.rng.gen();
         }
         self.sarduakar_invader = new_coord;
@@ -200,11 +206,17 @@ impl GameContext {
 
 pub struct Renderer {
     canvas: WindowCanvas,
+    texture_creator: TextureCreator<WindowContext>,
 }
 impl Renderer {
     pub fn new(window: Window) -> Result<Renderer, String> {
         let canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
-        Ok(Renderer { canvas })
+        let texture_creator = canvas.texture_creator();
+
+        Ok(Renderer {
+            canvas: canvas,
+            texture_creator: texture_creator,
+        })
     }
 
     fn draw_segment(&mut self, coord: &Coord) -> Result<(), String> {
@@ -219,13 +231,20 @@ impl Renderer {
     }
 
     fn draw_background(&mut self, ctx: &GameContext) {
-        let color = match ctx.current_state {
-            GameState::Paused => Color::RGB(30, 30, 30),
-            GameState::Playing => Color::RGB(76, 31, 22),
-            GameState::Over => Color::RGB(0, 0, 0),
+        match ctx.current_state {
+            GameState::Paused => {
+                self.canvas.set_draw_color(Color::RGB(30, 30, 30));
+                self.canvas.clear();
+            },
+            GameState::Playing => {
+                let t = self.texture_creator.load_texture("assets/desert1.png").unwrap();
+                self.canvas.copy(&t, None, None).unwrap();
+            },
+            GameState::Over => {
+                self.canvas.set_draw_color(Color::RGB(0, 0, 0));
+                self.canvas.clear();
+            },
         };
-        self.canvas.set_draw_color(color);
-        self.canvas.clear();
     }
 
     fn draw_sandworm(&mut self, ctx: &GameContext) -> Result<(), String> {
@@ -254,6 +273,7 @@ impl Renderer {
 pub fn main() -> Result<(), String> {
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
+    let _image_context = sdl2::image::init(InitFlag::PNG | InitFlag::JPG)?;
 
     let window = video_subsystem
         .window("~~~~~ SANDWORM ~~~~~", WINDOW_SIZE_X, WINDOW_SIZE_Y)
@@ -284,10 +304,26 @@ pub fn main() -> Result<(), String> {
                     keycode: Some(keycode),
                     ..
                 } => match keycode {
-                    Keycode::W => if ctx.sandworm_dir != WormDirection::Down {ctx.move_up()},
-                    Keycode::D => if ctx.sandworm_dir != WormDirection::Left {ctx.move_right()},
-                    Keycode::S => if ctx.sandworm_dir != WormDirection::Up {ctx.move_down()},
-                    Keycode::A => if ctx.sandworm_dir != WormDirection::Right {ctx.move_left()},
+                    Keycode::W => {
+                        if ctx.sandworm_dir != WormDirection::Down {
+                            ctx.move_up()
+                        }
+                    }
+                    Keycode::D => {
+                        if ctx.sandworm_dir != WormDirection::Left {
+                            ctx.move_right()
+                        }
+                    }
+                    Keycode::S => {
+                        if ctx.sandworm_dir != WormDirection::Up {
+                            ctx.move_down()
+                        }
+                    }
+                    Keycode::A => {
+                        if ctx.sandworm_dir != WormDirection::Right {
+                            ctx.move_left()
+                        }
+                    }
                     Keycode::Escape => ctx.toggle_pause(),
                     _ => {}
                 },
