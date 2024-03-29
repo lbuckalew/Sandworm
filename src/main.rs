@@ -235,15 +235,35 @@ impl Renderer {
             GameState::Paused => {
                 self.canvas.set_draw_color(Color::RGB(30, 30, 30));
                 self.canvas.clear();
-            },
+            }
             GameState::Playing => {
-                let t = self.texture_creator.load_texture("assets/desert1.png").unwrap();
-                self.canvas.copy(&t, None, None).unwrap();
-            },
+                let t = self
+                    .texture_creator
+                    .load_texture("assets/desert1.png")
+                    .unwrap();
+                self.canvas.clear();
+
+                for i in (0..SPICEFIELD_SIZE_X as i32) {
+                    for j in (0..SPICEFIELD_SIZE_Y as i32) {
+                        self.canvas
+                            .copy(
+                                &t,
+                                Rect::new(0, 0, 20, 20),
+                                Rect::new(
+                                    i * SPICEFIELD_SIZE_X as i32,
+                                    j * SPICEFIELD_SIZE_Y as i32,
+                                    SPICEFIELD_SIZE_X,
+                                    SPICEFIELD_SIZE_Y,
+                                ),
+                            )
+                            .unwrap();
+                    }
+                }
+            }
             GameState::Over => {
                 self.canvas.set_draw_color(Color::RGB(0, 0, 0));
                 self.canvas.clear();
-            },
+            }
         };
     }
 
