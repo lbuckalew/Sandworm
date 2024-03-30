@@ -207,6 +207,7 @@ impl GameContext {
 pub struct Renderer {
     canvas: WindowCanvas,
     texture_creator: TextureCreator<WindowContext>,
+    bg_state: bool,
 }
 impl Renderer {
     pub fn new(window: Window) -> Result<Renderer, String> {
@@ -216,6 +217,7 @@ impl Renderer {
         Ok(Renderer {
             canvas: canvas,
             texture_creator: texture_creator,
+            bg_state: true,
         })
     }
 
@@ -243,8 +245,8 @@ impl Renderer {
                     .unwrap();
                 self.canvas.clear();
 
-                for i in (0..SPICEFIELD_SIZE_X as i32) {
-                    for j in (0..SPICEFIELD_SIZE_Y as i32) {
+                for i in 0..SPICEFIELD_SIZE_X as i32 {
+                    for j in 0..SPICEFIELD_SIZE_Y as i32 {
                         self.canvas
                             .copy(
                                 &t,
