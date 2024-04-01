@@ -5,15 +5,13 @@ use sdl2::image::{InitFlag, LoadTexture};
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use sdl2::render::{Canvas, Texture, TextureCreator, WindowCanvas};
+use sdl2::render::{TextureCreator, WindowCanvas};
 use sdl2::video::{Window, WindowContext};
 
 use rand::distributions::{Distribution, Standard};
 use rand::Rng;
 
-use std::env;
 use std::ops::Add;
-use std::path::Path;
 use std::time::Duration;
 
 // Grid units (how many sandworm segments per x or y)
@@ -32,24 +30,24 @@ const TEXTURES_FILEPATH: &str = "assets/textures.png";
 const SPRITES_FILEPATH: &str = "assets/sprites.png";
 
 // Render options for sandworm sprite
-const SW_HEAD_UP: Coord = Coord {x:20, y:20};
-const SW_HEAD_RIGHT: Coord = Coord {x:20, y:0};
-const SW_HEAD_DOWN: Coord = Coord {x:40, y:0};
-const SW_HEAD_LEFT: Coord = Coord {x:40, y:20};
-const SW_TAIL_UP: Coord = Coord {x:40, y:60};
-const SW_TAIL_RIGHT: Coord = Coord {x:40, y:40};
-const SW_TAIL_DOWN: Coord = Coord {x:60, y:40};
-const SW_TAIL_LEFT: Coord = Coord {x:60, y:60};
-const SW_BODY_HORIZONTAL: Coord = Coord {x:0, y:20};
-const SW_BODY_VERTICAL: Coord = Coord {x:0, y:0};
-const SW_BODY_UP_LEFT: Coord = Coord {x:0, y:40};
-const SW_BODY_UP_RIGHT: Coord = Coord {x:20, y:40};
-const SW_BODY_LOW_LEFT: Coord = Coord {x:0, y:60};
-const SW_BODY_LOW_RIGHT: Coord = Coord {x:20, y:60};
+const SW_HEAD_UP: Coord = Coord { x: 20, y: 20 };
+const SW_HEAD_RIGHT: Coord = Coord { x: 20, y: 0 };
+const SW_HEAD_DOWN: Coord = Coord { x: 40, y: 0 };
+const SW_HEAD_LEFT: Coord = Coord { x: 40, y: 20 };
+const SW_TAIL_UP: Coord = Coord { x: 40, y: 60 };
+const SW_TAIL_RIGHT: Coord = Coord { x: 40, y: 40 };
+const SW_TAIL_DOWN: Coord = Coord { x: 60, y: 40 };
+const SW_TAIL_LEFT: Coord = Coord { x: 60, y: 60 };
+const SW_BODY_HORIZONTAL: Coord = Coord { x: 0, y: 20 };
+const SW_BODY_VERTICAL: Coord = Coord { x: 0, y: 0 };
+const SW_BODY_UP_LEFT: Coord = Coord { x: 0, y: 40 };
+const SW_BODY_UP_RIGHT: Coord = Coord { x: 20, y: 40 };
+const SW_BODY_LOW_LEFT: Coord = Coord { x: 0, y: 60 };
+const SW_BODY_LOW_RIGHT: Coord = Coord { x: 20, y: 60 };
 
 // Render options for sarduakar
-const SDKR_1: Coord = Coord {x: 60, y:0};
-const SDKR_2: Coord = Coord {x: 60, y:20};
+const SDKR_1: Coord = Coord { x: 60, y: 0 };
+const SDKR_2: Coord = Coord { x: 60, y: 20 };
 
 pub enum GameState {
     Playing,
@@ -194,30 +192,29 @@ impl GameContext {
     // Given a sandworm segment, return the direction of the sandworm based on the segment in front
     // of this one
     fn determine_transition(&self, sandworm_index: usize) -> Coord {
-        let mut texture_coord = Coord {x:0, y:0};
         if sandworm_index == 0 {
             let s0 = &self.sandworm[0];
             let s1 = &self.sandworm[1];
-            texture_coord = if s1.x == s0.x - 1 {
-                SW_HEAD_RIGHT
+            if s1.x == s0.x - 1 {
+                return SW_HEAD_RIGHT;
             } else if s1.x == s0.x + 1 {
-                SW_HEAD_LEFT
+                return SW_HEAD_LEFT;
             } else if s1.y == s0.y - 1 {
-                SW_HEAD_DOWN
+                return SW_HEAD_DOWN;
             } else {
-                SW_HEAD_UP
+                return SW_HEAD_UP;
             };
         } else if sandworm_index == self.sandworm.len() - 1 {
             let s0 = &self.sandworm[self.sandworm.len() - 1];
             let s1 = &self.sandworm[self.sandworm.len() - 2];
-            texture_coord = if s1.x == s0.x - 1 {
-                SW_TAIL_LEFT
+            if s1.x == s0.x - 1 {
+                return SW_TAIL_LEFT;
             } else if s1.x == s0.x + 1 {
-                SW_TAIL_RIGHT
+                return SW_TAIL_RIGHT;
             } else if s1.y == s0.y - 1 {
-                SW_TAIL_UP
+                return SW_TAIL_UP;
             } else {
-                SW_TAIL_DOWN
+                return SW_TAIL_DOWN;
             };
         } else {
             let s0 = &self.sandworm[sandworm_index - 1];
@@ -226,23 +223,40 @@ impl GameContext {
 
             if s0.x == s2.x {
                 // See if horizontal
-                texture_coord = SW_BODY_VERTICAL;
+                return SW_BODY_VERTICAL;
             } else if s0.y == s2.y {
                 // See if vertical
-                texture_coord = SW_BODY_HORIZONTAL;
+                return SW_BODY_HORIZONTAL;
             } else {
                 // Must be a curve, which way is it?
-                if s0.x == s2.x + 1 && s0.y == s2.y - 1 {
-                    texture_coord = SW_BODY_LOW_RIGHT;
-                } else if s0.x == s2.x - 1 && s0.y == s2.y + 1 {
-                    texture_coord = SW_BODY_UP_LEFT;
+                // matches lowright and upleft
+                if s2.x == s0.x + 1 && s2.y == s0.y - 1 {
+                    if s0.x == s1.x {
+                        return SW_BODY_UP_LEFT;
+                    } else {
+                        return SW_BODY_LOW_RIGHT;
+                    }
+                } else if s2.x == s0.x - 1 && s2.y == s0.y + 1 {
+                    if s0.y == s1.y {
+                        return SW_BODY_UP_LEFT;
+                    } else {
+                        return SW_BODY_LOW_RIGHT;
+                    }
+                } else if s2.x == s0.x + 1 && s2.y == s0.y + 1 {
+                    if s0.y == s1.y {
+                        return SW_BODY_UP_RIGHT;
+                    } else {
+                        return SW_BODY_LOW_LEFT;
+                    }
                 } else {
-                    texture_coord = SDKR_1;
+                    if s0.y == s1.y {
+                        return SW_BODY_LOW_LEFT;
+                    } else {
+                        return SW_BODY_UP_RIGHT;
+                    }
                 }
             }
         }
-
-        texture_coord
     }
 
     // Determine which way to grow the sandworm tail and add a segment
@@ -298,20 +312,26 @@ impl Renderer {
         })
     }
 
-    fn draw_segment(&mut self, ctx: &GameContext, coord: &Coord, index: usize) -> Result<(), String> {
-        let t = self
-            .texture_creator
-            .load_texture(SPRITES_FILEPATH)
-            .unwrap();
+    fn draw_segment(
+        &mut self,
+        ctx: &GameContext,
+        coord: &Coord,
+        index: usize,
+    ) -> Result<(), String> {
+        let t = self.texture_creator.load_texture(SPRITES_FILEPATH).unwrap();
 
         // Determine head/tail/direction
         let sprite_coord = ctx.determine_transition(index);
 
-
         self.canvas
             .copy(
                 &t,
-                Rect::new(sprite_coord.x, sprite_coord.y, SANDWORM_SEGMENT_PX, SANDWORM_SEGMENT_PX),
+                Rect::new(
+                    sprite_coord.x,
+                    sprite_coord.y,
+                    SANDWORM_SEGMENT_PX,
+                    SANDWORM_SEGMENT_PX,
+                ),
                 Rect::new(
                     coord.x * SANDWORM_SEGMENT_PX as i32,
                     coord.y * SANDWORM_SEGMENT_PX as i32,
@@ -369,12 +389,9 @@ impl Renderer {
     }
 
     fn draw_sarduakar(&mut self, ctx: &GameContext) -> Result<(), String> {
-        let t = self
-            .texture_creator
-            .load_texture(SPRITES_FILEPATH)
-            .unwrap();
+        let t = self.texture_creator.load_texture(SPRITES_FILEPATH).unwrap();
 
-            self.canvas
+        self.canvas
             .copy(
                 &t,
                 Rect::new(SDKR_1.x, SDKR_1.y, SANDWORM_SEGMENT_PX, SANDWORM_SEGMENT_PX),
@@ -386,7 +403,6 @@ impl Renderer {
                 ),
             )
             .unwrap();
-
 
         Ok(())
     }
