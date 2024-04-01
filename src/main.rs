@@ -19,14 +19,33 @@ use std::time::Duration;
 // Grid units (how many sandworm segments per x or y)
 const SPICEFIELD_SIZE_X: u32 = 40;
 const SPICEFIELD_SIZE_Y: u32 = 30;
+
 // Resultant pixel size of a sandworm segment
 const SANDWORM_SEGMENT_PX: u32 = 20;
+
 // Window size in pixels
 const WINDOW_SIZE_X: u32 = SPICEFIELD_SIZE_X * SANDWORM_SEGMENT_PX;
 const WINDOW_SIZE_Y: u32 = SPICEFIELD_SIZE_Y * SANDWORM_SEGMENT_PX;
+
 // Filepaths to assets
-const DESERT_TEXTURE_1: &str = "src/assets/desert1.png";
-const DESERT_TEXTURE_2: &str = "assets/desert2.png";
+const TEXTURES_FILEPATH: &str = "assets/textures.png";
+const SPRITES_FILEPATH: &str = "assets/sprites.png";
+
+// Render options for sandworm sprite
+const SW_HEAD_UP: Coord = Coord {x:20, y:20};
+const SW_HEAD_RIGHT: Coord = Coord {x:20, y:20};
+const SW_HEAD_DOWN: Coord = Coord {x:40, y:40};
+const SW_HEAD_LEFT: Coord = Coord {x:40, y:40};
+const SW_TAIL_UP: Coord = Coord {x:40, y:40};
+const SW_TAIL_RIGHT: Coord = Coord {x:40, y:40};
+const SW_TAIL_DOWN: Coord = Coord {x:60, y:60};
+const SW_TAIL_LEFT: Coord = Coord {x:60, y:60};
+const SW_BODY_HORIZONTAL: Coord = Coord {x:0, y:0};
+const SW_BODY_VERTICAL: Coord = Coord {x:0, y:0};
+const SW_BODY_LEFT_UP: Coord = Coord {x:60, y:60};
+const SW_BODY_UP_RIGHT: Coord = Coord {x:40, y:40};
+const SW_BODY_RIGHT_DOWN: Coord = Coord {x:20, y:20};
+const SW_BODY_DOWN_LEFT: Coord = Coord {x:20, y:20};
 
 pub enum GameState {
     Playing,
@@ -168,6 +187,12 @@ impl GameContext {
         c.x >= 0 && c.x <= SPICEFIELD_SIZE_X as i32 && c.y >= 0 && c.y <= SPICEFIELD_SIZE_Y as i32
     }
 
+    // Given a sandworm segment, return the direction of the sandworm based on the segment in front
+    // of this one
+    fn get_segment_direction(&self, sandworm_index: u32) -> WormDirection {
+        WormDirection::Up
+    }
+
     // Determine which way to grow the sandworm tail and add a segment
     fn grow_worm(&mut self) {
         // Find direction to grow
@@ -222,12 +247,23 @@ impl Renderer {
     }
 
     fn draw_segment(&mut self, coord: &Coord) -> Result<(), String> {
-        self.canvas.fill_rect(Rect::new(
-            coord.x * SANDWORM_SEGMENT_PX as i32,
-            coord.y * SANDWORM_SEGMENT_PX as i32,
-            SANDWORM_SEGMENT_PX,
-            SANDWORM_SEGMENT_PX,
-        ))?;
+        let t = self
+            .texture_creator
+            .load_texture(SPRITES_FILEPATH)
+            .unwrap();
+
+        self.canvas
+            .copy(
+                &t,
+                Rect::new(SW_BODY_HORIZONTAL.x, SW_BODY_HORIZONTAL.y, SANDWORM_SEGMENT_PX, SANDWORM_SEGMENT_PX),
+                Rect::new(
+                    coord.x * SANDWORM_SEGMENT_PX as i32,
+                    coord.y * SANDWORM_SEGMENT_PX as i32,
+                    SANDWORM_SEGMENT_PX,
+                    SANDWORM_SEGMENT_PX,
+                ),
+            )
+            .unwrap();
 
         Ok(())
     }
@@ -241,7 +277,7 @@ impl Renderer {
             GameState::Playing => {
                 let t = self
                     .texture_creator
-                    .load_texture("assets/desert1.png")
+                    .load_texture(TEXTURES_FILEPATH)
                     .unwrap();
                 self.canvas.clear();
 
