@@ -33,19 +33,23 @@ const SPRITES_FILEPATH: &str = "assets/sprites.png";
 
 // Render options for sandworm sprite
 const SW_HEAD_UP: Coord = Coord {x:20, y:20};
-const SW_HEAD_RIGHT: Coord = Coord {x:20, y:20};
-const SW_HEAD_DOWN: Coord = Coord {x:40, y:40};
-const SW_HEAD_LEFT: Coord = Coord {x:40, y:40};
-const SW_TAIL_UP: Coord = Coord {x:40, y:40};
+const SW_HEAD_RIGHT: Coord = Coord {x:20, y:0};
+const SW_HEAD_DOWN: Coord = Coord {x:40, y:0};
+const SW_HEAD_LEFT: Coord = Coord {x:40, y:20};
+const SW_TAIL_UP: Coord = Coord {x:40, y:60};
 const SW_TAIL_RIGHT: Coord = Coord {x:40, y:40};
-const SW_TAIL_DOWN: Coord = Coord {x:60, y:60};
+const SW_TAIL_DOWN: Coord = Coord {x:60, y:40};
 const SW_TAIL_LEFT: Coord = Coord {x:60, y:60};
-const SW_BODY_HORIZONTAL: Coord = Coord {x:0, y:0};
+const SW_BODY_HORIZONTAL: Coord = Coord {x:0, y:20};
 const SW_BODY_VERTICAL: Coord = Coord {x:0, y:0};
-const SW_BODY_LEFT_UP: Coord = Coord {x:60, y:60};
-const SW_BODY_UP_RIGHT: Coord = Coord {x:40, y:40};
-const SW_BODY_RIGHT_DOWN: Coord = Coord {x:20, y:20};
-const SW_BODY_DOWN_LEFT: Coord = Coord {x:20, y:20};
+const SW_BODY_UP_LEFT: Coord = Coord {x:0, y:40};
+const SW_BODY_UP_RIGHT: Coord = Coord {x:20, y:40};
+const SW_BODY_LOW_LEFT: Coord = Coord {x:0, y:60};
+const SW_BODY_LOW_RIGHT: Coord = Coord {x:20, y:60};
+
+// Render options for sarduakar
+const SDKR_1: Coord = Coord {x: 60, y:0};
+const SDKR_2: Coord = Coord {x: 60, y:20};
 
 pub enum GameState {
     Playing,
@@ -189,8 +193,56 @@ impl GameContext {
 
     // Given a sandworm segment, return the direction of the sandworm based on the segment in front
     // of this one
-    fn get_segment_direction(&self, sandworm_index: u32) -> WormDirection {
-        WormDirection::Up
+    fn determine_transition(&self, sandworm_index: usize) -> Coord {
+        let mut texture_coord = Coord {x:0, y:0};
+        if sandworm_index == 0 {
+            let s0 = &self.sandworm[0];
+            let s1 = &self.sandworm[1];
+            texture_coord = if s1.x == s0.x - 1 {
+                SW_HEAD_RIGHT
+            } else if s1.x == s0.x + 1 {
+                SW_HEAD_LEFT
+            } else if s1.y == s0.y - 1 {
+                SW_HEAD_DOWN
+            } else {
+                SW_HEAD_UP
+            };
+        } else if sandworm_index == self.sandworm.len() - 1 {
+            let s0 = &self.sandworm[self.sandworm.len() - 1];
+            let s1 = &self.sandworm[self.sandworm.len() - 2];
+            texture_coord = if s1.x == s0.x - 1 {
+                SW_TAIL_LEFT
+            } else if s1.x == s0.x + 1 {
+                SW_TAIL_RIGHT
+            } else if s1.y == s0.y - 1 {
+                SW_TAIL_UP
+            } else {
+                SW_TAIL_DOWN
+            };
+        } else {
+            let s0 = &self.sandworm[sandworm_index - 1];
+            let s1 = &self.sandworm[sandworm_index];
+            let s2 = &self.sandworm[sandworm_index + 1];
+
+            if s0.x == s2.x {
+                // See if horizontal
+                texture_coord = SW_BODY_VERTICAL;
+            } else if s0.y == s2.y {
+                // See if vertical
+                texture_coord = SW_BODY_HORIZONTAL;
+            } else {
+                // Must be a curve, which way is it?
+                if s0.x == s2.x + 1 && s0.y == s2.y - 1 {
+                    texture_coord = SW_BODY_LOW_RIGHT;
+                } else if s0.x == s2.x - 1 && s0.y == s2.y + 1 {
+                    texture_coord = SW_BODY_UP_LEFT;
+                } else {
+                    texture_coord = SDKR_1;
+                }
+            }
+        }
+
+        texture_coord
     }
 
     // Determine which way to grow the sandworm tail and add a segment
@@ -246,16 +298,20 @@ impl Renderer {
         })
     }
 
-    fn draw_segment(&mut self, coord: &Coord) -> Result<(), String> {
+    fn draw_segment(&mut self, ctx: &GameContext, coord: &Coord, index: usize) -> Result<(), String> {
         let t = self
             .texture_creator
             .load_texture(SPRITES_FILEPATH)
             .unwrap();
 
+        // Determine head/tail/direction
+        let sprite_coord = ctx.determine_transition(index);
+
+
         self.canvas
             .copy(
                 &t,
-                Rect::new(SW_BODY_HORIZONTAL.x, SW_BODY_HORIZONTAL.y, SANDWORM_SEGMENT_PX, SANDWORM_SEGMENT_PX),
+                Rect::new(sprite_coord.x, sprite_coord.y, SANDWORM_SEGMENT_PX, SANDWORM_SEGMENT_PX),
                 Rect::new(
                     coord.x * SANDWORM_SEGMENT_PX as i32,
                     coord.y * SANDWORM_SEGMENT_PX as i32,
@@ -306,23 +362,39 @@ impl Renderer {
     }
 
     fn draw_sandworm(&mut self, ctx: &GameContext) -> Result<(), String> {
-        self.canvas.set_draw_color(Color::BLUE);
-        for s in &ctx.sandworm {
-            self.draw_segment(&s)?;
+        for (i, s) in ctx.sandworm.iter().enumerate() {
+            self.draw_segment(ctx, s, i)?;
         }
         Ok(())
     }
 
-    fn draw_sardaukar(&mut self, ctx: &GameContext) -> Result<(), String> {
-        self.canvas.set_draw_color(Color::GRAY);
-        self.draw_segment(&ctx.sarduakar_invader)?;
+    fn draw_sarduakar(&mut self, ctx: &GameContext) -> Result<(), String> {
+        let t = self
+            .texture_creator
+            .load_texture(SPRITES_FILEPATH)
+            .unwrap();
+
+            self.canvas
+            .copy(
+                &t,
+                Rect::new(SDKR_1.x, SDKR_1.y, SANDWORM_SEGMENT_PX, SANDWORM_SEGMENT_PX),
+                Rect::new(
+                    ctx.sarduakar_invader.x * SANDWORM_SEGMENT_PX as i32,
+                    ctx.sarduakar_invader.y * SANDWORM_SEGMENT_PX as i32,
+                    SANDWORM_SEGMENT_PX,
+                    SANDWORM_SEGMENT_PX,
+                ),
+            )
+            .unwrap();
+
+
         Ok(())
     }
 
     pub fn draw(&mut self, ctx: &GameContext) -> Result<(), String> {
         self.draw_background(ctx);
         self.draw_sandworm(ctx)?;
-        self.draw_sardaukar(ctx)?;
+        self.draw_sarduakar(ctx)?;
         self.canvas.present();
         Ok(())
     }
@@ -349,7 +421,7 @@ pub fn main() -> Result<(), String> {
     'running: loop {
         match ctx.current_state {
             GameState::Over => {
-                ::std::thread::sleep(Duration::new(10, 0));
+                ::std::thread::sleep(Duration::new(2, 0));
                 break 'running;
             }
             _ => (),
